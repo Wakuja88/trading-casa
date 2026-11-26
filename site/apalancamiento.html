@@ -177,6 +177,8 @@ const $ = id => document.getElementById(id);
 let side = 'long';
 const units = {gain:'pct', marg:'pct'};
 const usd = v => isFinite(v) ? v.toLocaleString('es-MX',{style:'currency',currency:'USD',maximumFractionDigits:2}) : '–';
+// Margex no acepta decimales en el tamaño de posición: se muestra en dólares enteros
+const usd0 = v => isFinite(v) ? v.toLocaleString('es-MX',{style:'currency',currency:'USD',maximumFractionDigits:0}) : '–';
 const pct = (v,d=2) => isFinite(v) ? (v*100).toFixed(d)+'%' : '–';
 const num = v => isFinite(v) ? v.toLocaleString('es-MX',{maximumFractionDigits: v<10?4:2}) : '–';
 const val = id => parseFloat($(id).value);
@@ -186,7 +188,8 @@ const round = v => +v.toFixed(4);
 function toUsd(f, A){ const v = val(f); return units[f]==='pct' ? A*v/100 : v; }
 
 function calc(A,G,M,L,c,mm){
-  const N = M*L;
+  // Posición redondeada hacia arriba a dólares enteros (así se captura en Margex)
+  const N = Math.ceil(M*L - 1e-9);
   const costTp = N*(c.entry + c.maker);
   const tp = (G + costTp)/N;
   const liq = Math.max(1/L - c.taker - mm, 0); // Margex: liquida cuando lo que queda del margen = comisión de cierre a mercado + colchón
@@ -211,7 +214,7 @@ function render(){
   $('oTpP').textContent = E>0 ? 'Take profit en '+num(priceAt(E,r.tp)) : '';
   $('oLqP').textContent = E>0 ? 'Liquidación en '+num(priceAt(E,-r.liq)) : '';
   $('oM').textContent=usd(M)+' ('+pct(M/A)+')';
-  $('oN').textContent=usd(r.N);
+  $('oN').textContent=usd0(r.N);
   $('oPL').textContent='+'+usd(G)+' / −'+usd(M+r.entryFee);
   $('oRR').textContent='1 : '+(G/M).toFixed(2);
   $('oFee').textContent=usd(r.costTp);
@@ -227,11 +230,11 @@ function render(){
   $('tbl').innerHTML=levs.map(l=>{
     const x=calc(A,G,M,l,c,mm);
     const ok = x.liq>=0.01;
-    return '<tr class="'+(l===L?'cur':'')+'"><td>'+num(l)+'x</td><td>'+usd(x.N)+'</td><td class="w">'+pct(x.tp)+'</td><td class="l">'+pct(x.liq)+'</td><td>'+(ok?'<span class="tag ok">Sí</span>':'<span class="tag no">No</span>')+'</td></tr>';
+    return '<tr class="'+(l===L?'cur':'')+'"><td>'+num(l)+'x</td><td>'+usd0(x.N)+'</td><td class="w">'+pct(x.tp)+'</td><td class="l">'+pct(x.liq)+'</td><td>'+(ok?'<span class="tag ok">Sí</span>':'<span class="tag no">No</span>')+'</td></tr>';
   }).join('');
 
   // Equivalencias: misma posición (margen × apalancamiento), distinto margen
-  $('eqPos').textContent=usd(r.N);
+  $('eqPos').textContent=usd0(r.N);
   $('opMarg').textContent=usd(M)+' ('+pct(M/A)+')';
   $('eqSub').textContent='Todas ganan lo mismo y necesitan el mismo '+pct(r.tp)+' para tu meta. Lo que cambia es cuánto arriesgas y qué tan lejos te liquidan.';
   $('thLiqP').style.display = E>0 ? '' : 'none';
