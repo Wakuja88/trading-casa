@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora de movimiento y apalancamiento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1f6; --panel:#ffffff; --ink:#18223a; --muted:#5d6782; --line:#d6dbe6;
+  --accent:#2747c9; --win:#0f8a5f; --loss:#c23a32; --warn:#a86a00; --warnbg:#fff4dd; --field:#f6f8fb;
+  color-scheme: light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121826; --panel:#1b2335; --ink:#e7ebf4; --muted:#97a1ba; --line:#2d3850;
+    --accent:#7d97ff; --win:#3fcf95; --loss:#ff7b72; --warn:#f2b54a; --warnbg:#3a2e14; --field:#151c2b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121826; --panel:#1b2335; --ink:#e7ebf4; --muted:#97a1ba; --line:#2d3850;
+  --accent:#7d97ff; --win:#3fcf95; --loss:#ff7b72; --warn:#f2b54a; --warnbg:#3a2e14; --field:#151c2b;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums;line-height:1.45}
+main{max-width:1080px;margin:0 auto;padding:28px 16px 48px}
+h1{font-size:1.7rem;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 24px;max-width:66ch}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.panel h2{font-size:1.05rem;margin:0 0 12px;font-weight:600}
+label,.lbl{display:block;font-size:.88rem;color:var(--muted);margin:12px 0 4px}
+input,select{width:100%;padding:10px 12px;font:inherit;font-size:1rem;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;padding:9px;border:0;background:var(--field);color:var(--muted);font:inherit;font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.unit{display:grid;grid-template-columns:1fr auto;gap:6px}
+.unit .seg button{padding:0 12px;font-size:.85rem}
+.eq{font-size:.8rem;color:var(--muted);margin-top:4px;min-height:1.1em}
+.hint{font-size:.8rem;color:var(--muted);margin-top:10px}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media (max-width:420px){.big{grid-template-columns:1fr}}
+.move{border-radius:12px;padding:14px 16px;border:1px solid var(--line)}
+.move .k{font-size:.88rem;color:var(--muted)}
+.move .v{font-size:2.2rem;font-weight:700;line-height:1.1;margin-top:2px}
+.move .p{font-size:.92rem;margin-top:4px}
+.tp .v{color:var(--win)} .sl .v{color:var(--loss)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;margin:4px 0 0}
+.stats div{border-top:1px solid var(--line);padding-top:8px}
+.stats dt{font-size:.8rem;color:var(--muted)} .stats dd{margin:2px 0 0;font-weight:600}
+.alert{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem;margin-top:12px}
+.alert.bad{color:var(--loss)}
+.tablewrap{overflow-x:auto;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:.92rem;min-width:480px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500;font-size:.82rem}
+tr.cur td{background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:600}
+td.w{color:var(--win)} td.l{color:var(--loss)}
+.tag{font-size:.75rem;padding:2px 7px;border-radius:999px;font-weight:600}
+.tag.ok{color:var(--win);border:1px solid var(--win)} .tag.no{color:var(--loss);border:1px solid var(--loss)}
+.section{margin-top:20px}
+.eqpos{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:.95rem;margin:-2px 0 6px}
+.eqpos strong{color:var(--win);font-size:2rem;font-weight:700;line-height:1.1}
+.eqsub{color:var(--muted);font-size:.9rem;margin:0 0 8px;max-width:70ch}
+.tag.warn{color:var(--warn);border:1px solid var(--warn)}
+.rev{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.rev .out{font-size:1.5rem;font-weight:700;color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>¿Cuánto se tiene que mover el precio?</h1>
+  <p class="sub">Tu margen es tu riesgo: si te liquidan, pierdes el margen y nada más. Pon cuánto quieres ganar, cuánto margen metes y el apalancamiento, y te digo el movimiento para tu meta y dónde te liquidan.</p>
+
+  <div class="grid">
+    <section class="panel" aria-label="Datos">
+      <h2>Tus datos</h2>
+      <label for="cap">Capital de la cuenta (USD)</label>
+      <input id="cap" type="number" min="0" step="any" value="1000">
+
+      <label for="gain">Quiero ganar</label>
+      <div class="unit">
+        <input id="gain" type="number" min="0" step="any" value="3">
+        <div class="seg" role="group" aria-label="Unidad de ganancia">
+          <button type="button" data-f="gain" data-u="pct" aria-pressed="true">%</button>
+          <button type="button" data-f="gain" data-u="usd" aria-pressed="false">USD</button>
+        </div>
+      </div>
+      <div class="eq" id="gainEq"></div>
+
+      <label for="marg">Margen (lo que arriesgas)</label>
+      <div class="unit">
+        <input id="marg" type="number" min="0" step="any" value="6">
+        <div class="seg" role="group" aria-label="Unidad de margen">
+          <button type="button" data-f="marg" data-u="pct" aria-pressed="true">%</button>
+          <button type="button" data-f="marg" data-u="usd" aria-pressed="false">USD</button>
+        </div>
+      </div>
+      <div class="eq" id="margEq"></div>
+
+      <label for="lev">Apalancamiento (x)</label>
+      <input id="lev" type="number" min="1" step="any" value="20">
+
+      <span class="lbl">Dirección</span>
+      <div class="seg" role="group" aria-label="Dirección">
+        <button type="button" id="bLong" aria-pressed="true">Long</button>
+        <button type="button" id="bShort" aria-pressed="false">Short</button>
+      </div>
+
+      <label for="entry">Precio de entrada (opcional)</label>
+      <input id="entry" type="number" min="0" step="any" placeholder="Ej. 98500">
+
+      <label for="etype">Entrada con</label>
+      <select id="etype"><option value="taker">Orden de mercado</option><option value="maker">Orden limit</option></select>
+      <div class="row2">
+        <div><label for="taker">Comisión mercado (%)</label><input id="taker" type="number" min="0" step="any" value="0.06"></div>
+        <div><label for="maker">Comisión limit (%)</label><input id="maker" type="number" min="0" step="any" value="0.019"></div>
+      </div>
+      <label for="mm">Colchón de liquidación (%)</label>
+      <input id="mm" type="number" min="0" step="any" value="0.02">
+      <p class="hint">Comisiones de Margex: el take profit sale como limit (0.019%). Usa margen aislado. Liquidación calibrada con una posición real de Margex (BTC 50x). Si en otro activo no cuadra, ajusta el colchón.</p>
+    </section>
+
+    <div>
+      <section class="panel" aria-live="polite">
+        <div class="big">
+          <div class="move tp"><div class="k">Movimiento a favor para tu meta</div><div class="v" id="oTp">–</div><div class="p" id="oTpP"></div></div>
+          <div class="move sl"><div class="k">Movimiento en contra hasta liquidación</div><div class="v" id="oLq">–</div><div class="p" id="oLqP"></div></div>
+        </div>
+        <dl class="stats">
+          <div><dt>Margen</dt><dd id="oM">–</dd></div>
+          <div><dt>Tamaño de posición</dt><dd id="oN">–</dd></div>
+          <div><dt>Ganancia neta / pérdida máx.</dt><dd id="oPL">–</dd></div>
+          <div><dt>Riesgo : beneficio</dt><dd id="oRR">–</dd></div>
+          <div><dt>Comisiones si sale TP</dt><dd id="oFee">–</dd></div>
+        </dl>
+        <div id="alerts"></div>
+      </section>
+
+      <section class="panel section">
+        <h2>Equivalencias</h2>
+        <div class="eqpos">Misma posición <strong id="eqPos">–</strong></div>
+        <p class="eqsub" id="eqSub"></p>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Apalanc.</th><th>Margen (%)</th><th>Margen (USD)</th><th>Liquidación</th><th id="thLiqP">Precio liq.</th><th>Estado</th></tr></thead>
+            <tbody id="tblEq"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel section">
+        <h2>Opciones por apalancamiento</h2>
+        <div class="eqpos">Mismo margen <strong id="opMarg">–</strong></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Apalanc.</th><th>Posición</th><th>Mov. meta</th><th>Liquidación</th><th>¿Aguanta más de 1%?</th></tr></thead>
+            <tbody id="tbl"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let side = 'long';
+const units = {gain:'pct', marg:'pct'};
+const usd = v => isFinite(v) ? v.toLocaleString('es-MX',{style:'currency',currency:'USD',maximumFractionDigits:2}) : '–';
+const pct = (v,d=2) => isFinite(v) ? (v*100).toFixed(d)+'%' : '–';
+const num = v => isFinite(v) ? v.toLocaleString('es-MX',{maximumFractionDigits: v<10?4:2}) : '–';
+const val = id => parseFloat($(id).value);
+const round = v => +v.toFixed(4);
+
+// Convierte el campo a USD según su unidad
+function toUsd(f, A){ const v = val(f); return units[f]==='pct' ? A*v/100 : v; }
+
+function calc(A,G,M,L,c,mm){
+  const N = M*L;
+  const costTp = N*(c.entry + c.maker);
+  const tp = (G + costTp)/N;
+  const liq = Math.max(1/L - c.taker - mm, 0); // Margex: liquida cuando lo que queda del margen = comisión de cierre a mercado + colchón
+  return {N,costTp,tp,liq,entryFee:N*c.entry};
+}
+function priceAt(E,move){ return side==='long' ? E*(1+move) : E*(1-move); }
+
+function render(){
+  const A=val('cap'), L=val('lev'), mm=(val('mm')||0)/100, E=val('entry');
+  const taker=(val('taker')||0)/100, maker=(val('maker')||0)/100;
+  const c={taker,maker,entry:$('etype').value==='maker'?maker:taker};
+  const G=toUsd('gain',A), M=toUsd('marg',A);
+
+  $('gainEq').textContent = A>0 && G>0 ? (units.gain==='pct' ? '= '+usd(G) : '= '+pct(G/A)+' de la cuenta') : '';
+  $('margEq').textContent = A>0 && M>0 ? (units.marg==='pct' ? '= '+usd(M) : '= '+pct(M/A)+' de la cuenta') : '';
+
+  if(!(A>0&&G>0&&M>0&&L>=1)){ $('alerts').innerHTML='<div class="alert">Completa capital, ganancia, margen y apalancamiento con valores mayores a cero.</div>'; return; }
+
+  const r=calc(A,G,M,L,c,mm);
+  $('oTp').textContent=pct(r.tp);
+  $('oLq').textContent=pct(r.liq);
+  $('oTpP').textContent = E>0 ? 'Take profit en '+num(priceAt(E,r.tp)) : '';
+  $('oLqP').textContent = E>0 ? 'Liquidación en '+num(priceAt(E,-r.liq)) : '';
+  $('oM').textContent=usd(M)+' ('+pct(M/A)+')';
+  $('oN').textContent=usd(r.N);
+  $('oPL').textContent='+'+usd(G)+' / −'+usd(M+r.entryFee);
+  $('oRR').textContent='1 : '+(G/M).toFixed(2);
+  $('oFee').textContent=usd(r.costTp);
+
+  const alerts=[];
+  if(M > A) alerts.push(['bad','El margen es mayor que tu capital.']);
+  if(r.liq<0.01) alerts.push(['bad','Te liquidan con menos de 1% en contra. Eso es ruido normal del precio: baja el apalancamiento o sube el margen.']);
+  if(r.costTp > 0.25*G) alerts.push(['','Las comisiones son más del 25% de tu ganancia. Revisa si vale la pena ese tamaño.']);
+  $('alerts').innerHTML=alerts.map(a=>'<div class="alert '+a[0]+'">'+a[1]+'</div>').join('');
+
+  // 1, de 5 en 5 hasta 50, de 10 en 10 hasta 100, más el apalancamiento actual
+  const levs=[...new Set([1,5,10,15,20,25,30,35,40,45,50,60,70,80,90,100,L])].sort((a,b)=>a-b);
+  $('tbl').innerHTML=levs.map(l=>{
+    const x=calc(A,G,M,l,c,mm);
+    const ok = x.liq>=0.01;
+    return '<tr class="'+(l===L?'cur':'')+'"><td>'+num(l)+'x</td><td>'+usd(x.N)+'</td><td class="w">'+pct(x.tp)+'</td><td class="l">'+pct(x.liq)+'</td><td>'+(ok?'<span class="tag ok">Sí</span>':'<span class="tag no">No</span>')+'</td></tr>';
+  }).join('');
+
+  // Equivalencias: misma posición (margen × apalancamiento), distinto margen
+  $('eqPos').textContent=usd(r.N);
+  $('opMarg').textContent=usd(M)+' ('+pct(M/A)+')';
+  $('eqSub').textContent='Todas ganan lo mismo y necesitan el mismo '+pct(r.tp)+' para tu meta. Lo que cambia es cuánto arriesgas y qué tan lejos te liquidan.';
+  $('thLiqP').style.display = E>0 ? '' : 'none';
+  $('tblEq').innerHTML=levs.map(l=>{
+    const m=r.N/l, x=calc(A,G,m,l,c,mm);
+    const tag = m>A ? '<span class="tag no">No alcanza el capital</span>'
+              : x.liq<0.01 ? '<span class="tag warn">Liq. menor a 1%</span>'
+              : '<span class="tag ok">OK</span>';
+    return '<tr class="'+(l===L?'cur':'')+'"><td>'+num(l)+'x</td><td>'+pct(m/A)+'</td><td>'+usd(m)+'</td><td class="l">'+pct(x.liq)+'</td>'+
+      (E>0?'<td>'+num(priceAt(E,-x.liq))+'</td>':'')+'<td>'+tag+'</td></tr>';
+  }).join('');
+
+}
+
+// Cambio de unidad: convierte el valor para que represente lo mismo
+document.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{
+  const f=b.dataset.f, u=b.dataset.u;
+  if(units[f]===u) return;
+  const A=val('cap'), v=val(f);
+  if(A>0 && isFinite(v)) $(f).value = u==='usd' ? round(A*v/100) : round(v/A*100);
+  units[f]=u;
+  document.querySelectorAll('[data-f="'+f+'"]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.u===u?'true':'false'));
+  render();
+}));
+
+['cap','gain','marg','lev','entry','etype','taker','maker','mm'].forEach(id=>$(id).addEventListener('input',render));
+$('bLong').onclick=()=>{side='long';$('bLong').setAttribute('aria-pressed','true');$('bShort').setAttribute('aria-pressed','false');render();};
+$('bShort').onclick=()=>{side='short';$('bShort').setAttribute('aria-pressed','true');$('bLong').setAttribute('aria-pressed','false');render();};
+render();
+</script>
+</body>
+</html>

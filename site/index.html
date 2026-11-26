@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadoras de trading</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%93%88</text></svg>">
+<style>
+:root{
+  --bg:#eef1f6; --bar:#ffffff; --ink:#18223a; --muted:#5d6782; --line:#d6dbe6; --accent:#2747c9;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#121826; --bar:#1b2335; --ink:#e7ebf4; --muted:#97a1ba; --line:#2d3850; --accent:#7d97ff; color-scheme:dark; }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:flex-end;gap:8px;padding:8px 16px 0;padding-top:max(8px,env(safe-area-inset-top));background:var(--bar);border-bottom:1px solid var(--line)}
+nav{display:flex;gap:4px;overflow-x:auto;min-width:0;flex:1}
+.out{flex:none;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;padding:6px 10px;margin-bottom:6px;border:1px solid var(--line);border-radius:8px;white-space:nowrap}
+.out[hidden]{display:none}
+.out:hover{color:var(--ink);border-color:var(--accent)}
+.out:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+nav button{font:inherit;font-size:14px;font-weight:600;color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;padding:10px 11px 9px;cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:6px}
+.frames{flex:1;position:relative}
+iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg)}
+iframe[hidden],.ext[hidden]{display:none}
+.ext{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;color:var(--muted)}
+.ext p{margin:0;max-width:46ch;line-height:1.5}
+.ext a{font-size:17px;font-weight:600;color:#fff;background:var(--accent);text-decoration:none;padding:12px 22px;border-radius:10px}
+.ext a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+<nav role="tablist" aria-label="Herramientas">
+  <button role="tab" id="t-interes" aria-controls="f-interes" data-tab="interes">Interés compuesto</button>
+  <button role="tab" id="t-apalancamiento" aria-controls="f-apalancamiento" data-tab="apalancamiento">Apalancamiento</button>
+  <button role="tab" id="t-reloj" aria-controls="f-reloj" data-tab="reloj">Reloj de mercados</button>
+  <button role="tab" id="t-equity" aria-controls="f-equity" data-tab="equity">Equity Journal</button>
+  <button role="tab" id="t-calendario" aria-controls="f-calendario" data-tab="calendario">Calendario económico</button>
+  <button role="tab" id="t-noticias" aria-controls="f-noticias" data-tab="noticias">Noticias cripto</button>
+  <button role="tab" id="t-etf" aria-controls="f-etf" data-tab="etf">ETF BTC</button>
+  <button role="tab" id="t-liquidaciones" aria-controls="f-liquidaciones" data-tab="liquidaciones">Liquidaciones</button>
+</nav>
+<a class="out" id="out" href="#" target="_blank" rel="noopener" title="Si una página no carga aquí adentro, ábrela en otra pestaña">Abrir aparte ↗</a>
+</header>
+<div class="frames">
+  <iframe id="f-interes" title="Interés compuesto" data-src="interes.html" hidden></iframe>
+  <iframe id="f-apalancamiento" title="Apalancamiento" data-src="apalancamiento.html" hidden></iframe>
+  <iframe id="f-reloj" title="Reloj de mercados" data-src="reloj.html" hidden></iframe>
+  <!-- Google Apps Script: pide sesión de Google, así que la URL sola no da acceso a nadie más -->
+  <iframe id="f-equity" title="Equity Journal" data-src="https://script.google.com/macros/s/AKfycbxAgsXGHgiV1YFAGfGq2tNxoqmWDxWvPEG2xsT8Uhm9-9E681M-fk9NmY-lRvZlNjw0/exec" allow="clipboard-write" hidden></iframe>
+  <!-- Forex Factory y Coinglass bloquean iframes: en la PC se ven gracias a la extensión de Chrome; en el cel usa "Abrir aparte" -->
+  <iframe id="f-calendario" title="Calendario económico" data-src="https://www.forexfactory.com/calendar" hidden></iframe>
+  <iframe id="f-noticias" title="Noticias cripto" data-src="noticias.html" hidden></iframe>
+  <iframe id="f-etf" title="ETF BTC" data-src="https://farside.co.uk/btc/" hidden></iframe>
+  <iframe id="f-liquidaciones" title="Liquidaciones" data-src="liquidaciones.html" hidden></iframe>
+</div>
+<script>
+(function(){
+  const tabs = [...document.querySelectorAll('[data-tab]')];
+  const KEY = 'calc-tab';
+  // Si el link trae parámetros del interés compuesto (#p0=...), se los pasamos a esa pestaña
+  const hash = location.hash.slice(1);
+  const interesHash = hash.includes('=') ? '#' + hash : '';
+
+  function show(name){
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      const f = document.getElementById('f-' + t.dataset.tab);
+      if (f.classList.contains('ext')) {
+        if (!f.childElementCount) f.innerHTML = '<p>' + f.dataset.name + ' no permite mostrarse dentro de otra página.</p>' +
+          '<a href="' + f.dataset.src + '" target="_blank" rel="noopener">Abrir ' + f.dataset.name + ' ↗</a>';
+      } else if (on && !f.src) f.src = f.dataset.src + (t.dataset.tab === 'interes' ? interesHash : '');
+      f.hidden = !on;
+      if (on) {
+        const out = document.getElementById('out');
+        out.href = f.src || f.dataset.src;
+        // liquidaciones trae su propio botón; los externos ya muestran uno grande
+        out.hidden = t.dataset.tab === 'liquidaciones' || f.classList.contains('ext');
+      }
+    });
+    try { localStorage.setItem(KEY, name); } catch(e) {}
+    if (!interesHash) try { history.replaceState(null, '', '#' + name); } catch(e) {}
+  }
+
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => show(t.dataset.tab));
+    t.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const n = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+      n.focus(); show(n.dataset.tab);
+    });
+  });
+
+  let start = interesHash ? 'interes' : (tabs.some(t => t.dataset.tab === hash) ? hash : null);
+  if (!start) try { start = localStorage.getItem(KEY); } catch(e) {}
+  show(tabs.some(t => t.dataset.tab === start) ? start : 'interes');
+})();
+</script>
+</body>
+</html>

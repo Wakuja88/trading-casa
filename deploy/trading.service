@@ -1,0 +1,16 @@
+[Unit]
+Description=Trading casa (interés compuesto, apalancamiento, reloj)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=trading
+Environment=SITE_DIR=/opt/trading/site
+Environment=DATA_DIR=/var/lib/interes
+StateDirectory=interes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+ExecStart=/usr/bin/python3 /opt/trading/server.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

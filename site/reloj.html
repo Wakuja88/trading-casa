@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reloj de mercados 24 h</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F8; --surface:#FFFFFF; --ink:#14203A; --muted:#5A6782; --track:#DCE3EE;
+  --line:#D3DBE8; --hand:#E2445C; --open:#1F8F5F; --open-bg:#DDF3E8; --pause:#A86A00; --pause-bg:#FBEFD6;
+  --closed-bg:#E9EDF4; --hol-bg:#FCE3E7;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1729; --surface:#17213A; --ink:#E8EDF7; --muted:#8E9AB5; --track:#222E49;
+    --line:#2A3754; --hand:#FF5C73; --open:#4CC38A; --open-bg:#173B32; --pause:#F2B544; --pause-bg:#3A3020;
+    --closed-bg:#1E2945; --hol-bg:#3D2230; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1729; --surface:#17213A; --ink:#E8EDF7; --muted:#8E9AB5; --track:#222E49;
+  --line:#2A3754; --hand:#FF5C73; --open:#4CC38A; --open-bg:#173B32; --pause:#F2B544; --pause-bg:#3A3020;
+  --closed-bg:#1E2945; --hol-bg:#3D2230; color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:20px}
+h1{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;font-size:clamp(28px,4vw,40px);letter-spacing:-0.02em;margin:0;line-height:1.05}
+.sub{color:var(--muted);margin:6px 0 0}
+label.tz{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+select{font:inherit;font-size:15px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:240px}
+select:focus-visible,.row:focus-visible{outline:2px solid var(--hand);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:start}
+.dialcol{position:sticky;top:16px}
+.dial{position:relative;width:100%;max-width:min(680px,calc(100vh - 90px));margin:0 auto}
+.center-name{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:15px}
+.dial svg{width:100%;height:auto;display:block}
+.hourlbl{font-family:"Space Grotesk",sans-serif;font-size:13px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.hourlbl.major{fill:var(--ink);font-weight:600;font-size:15px}
+.tick{stroke:var(--line);stroke-width:1.5}
+.tick.major{stroke:var(--muted);stroke-width:2}
+.trackc{fill:none;stroke:var(--track);stroke-width:11}
+.seg{fill:none;stroke-width:11;stroke-linecap:round;transition:opacity .2s}
+.seg.ext{stroke-width:5;opacity:.45}
+.ringlbl{font-family:"Space Grotesk",sans-serif;font-size:8px;font-weight:700;letter-spacing:.04em;fill:#0F1729;pointer-events:none;transition:opacity .2s}
+.dim .ring:not(.hl) .ringlbl{opacity:.25}
+.dim .ring:not(.hl) .seg{opacity:.18}
+.dim .ring:not(.hl) .seg.ext{opacity:.08}
+.center-time{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:52px;fill:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-0.03em}
+.center-sec{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:18px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.center-meta{font-size:13px;fill:var(--muted)}
+.hand{stroke:var(--hand);stroke-width:2.5;stroke-linecap:round}
+.handdot{fill:var(--hand)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.summary{padding:16px 18px;border-bottom:1px solid var(--line)}
+.summary strong{font-family:"Space Grotesk",sans-serif;font-size:20px;font-weight:600;display:block}
+.summary span{color:var(--muted);font-size:14px}
+.row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+.row.sel{background:color-mix(in srgb,var(--track) 75%,transparent)}
+.row.sel .name{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+.row:last-child{border-bottom:0}
+.row:hover,.row.hl{background:color-mix(in srgb,var(--track) 45%,transparent)}
+.dot{width:12px;height:12px;border-radius:50%}
+.name{font-weight:600}
+.ex{color:var(--muted);font-weight:400;font-size:13px;margin-left:6px}
+.hrs{grid-column:2 / span 2;display:none;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.row.sel .hrs{display:block}
+.right{display:flex;align-items:center;justify-content:flex-end;gap:10px;text-align:right}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:999px}
+.pill.open{color:var(--open);background:var(--open-bg)}
+.pill.pause{color:var(--pause);background:var(--pause-bg)}
+.pill.closed{color:var(--muted);background:var(--closed-bg)}
+.pill.holiday{color:var(--hand);background:var(--hol-bg)}
+.hol{color:var(--hand)}
+.upc{border-top:1px solid var(--line);padding:14px 18px 16px}
+.upc summary{font-family:"Space Grotesk",sans-serif;font-size:16px;font-weight:600;cursor:pointer}
+.upc ul{list-style:none;margin:8px 0 0;padding:0}
+.upc li{display:grid;grid-template-columns:92px 12px minmax(0,1fr);gap:8px;align-items:center;padding:4px 0;font-size:14px}
+.upc .d{color:var(--muted);font-variant-numeric:tabular-nums}
+.upc .empty{color:var(--muted);font-size:14px}
+.opts{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);margin-top:14px;justify-content:center}
+.opts input{accent-color:var(--hand);width:16px;height:16px}
+.cd{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.loc{font-family:"Space Grotesk",sans-serif;font-variant-numeric:tabular-nums;color:var(--ink)}
+footer{color:var(--muted);font-size:13px;margin-top:22px;max-width:70ch}
+@media (max-width:860px){
+  .wrap{padding-top:16px}
+  h1{font-size:26px}
+  .sub{display:none}
+  header{margin-bottom:10px}
+  .grid{grid-template-columns:1fr;gap:12px}
+  select{min-width:0;width:100%}
+  label.tz{width:100%}
+  .dialcol{top:0;z-index:5;background:var(--bg);margin:0 -20px;padding:calc(env(safe-area-inset-top,0px) + 6px) 20px 8px;border-bottom:1px solid var(--line)}
+  .dial{max-width:min(100%,44vh)}
+  .opts{margin-top:4px;font-size:13px}
+  .ex{display:none}
+  .row{padding:9px 14px}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+}
+@media (prefers-reduced-motion:reduce){.seg{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Reloj de mercados</h1>
+      <p class="sub">Horarios de las principales bolsas en tu zona horaria, con cuenta regresiva.</p>
+    </div>
+    <label class="tz">Tu zona horaria
+      <select id="tz"></select>
+    </label>
+  </header>
+
+  <div class="grid">
+    <div class="dialcol"><div class="dial" id="dial"></div><label class="opts"><input type="checkbox" id="ext"> Mostrar pre y post mercado</label></div>
+    <div class="panel">
+      <div class="summary"><strong id="sumTitle"></strong><span id="sumText"></span></div>
+      <div id="list"></div>
+      <details class="upc"><summary>Próximos festivos</summary><ul id="upc"></ul></details>
+    </div>
+  </div>
+
+  <footer>Horario de sesión regular. Los cambios de horario de verano se ajustan solos. Festivos y cierres anticipados cargados hasta diciembre de 2027 para Nueva York, BMV, Londres, Fráncfort, Tokio y Hong Kong. Shanghái, Bombay, Singapur y Sídney tienen 2027 parcial porque sus calendarios oficiales aún no salen. En días festivos de EE. UU. el horario de CME Globex para metales es reducido y aquí es aproximado: confírmalo en CME. El pre y post mercado muestra las subastas y sesiones extendidas de cada bolsa, de forma aproximada; en Fráncfort incluye la sesión de Börse Frankfurt hasta las 22:00.</footer>
+</div>
+
+<script>
+const MKTS = [
+  {id:'cry', code:'CRIPTO', name:'Cripto', ex:'24/7', always:true, c:'#45B894'},
+  {id:'cme', code:'CME', name:'Oro y plata', ex:'CME Globex', tz:'America/New_York', globex:true, c:'#B8A46A'},
+  {id:'syd', code:'SYD', name:'Sídney', ex:'ASX', tz:'Australia/Sydney', s:[[10,0,16,0]], x:[[7,0,10,0],[16,10,17,0]], c:'#E8B85C'},
+  {id:'tyo', code:'TYO', name:'Tokio', ex:'TSE', tz:'Asia/Tokyo', s:[[9,0,11,30],[12,30,15,30]], x:[[8,0,9,0]], c:'#E0903B'},
+  {id:'hkg', code:'HKG', name:'Hong Kong', ex:'HKEX', tz:'Asia/Hong_Kong', s:[[9,30,12,0],[13,0,16,0]], x:[[9,0,9,30],[16,0,16,10]], c:'#D9733A'},
+  {id:'sha', code:'SHA', name:'Shanghái', ex:'SSE', tz:'Asia/Shanghai', s:[[9,30,11,30],[13,0,15,0]], x:[[9,15,9,30],[15,5,15,30]], c:'#C9583E'},
+  {id:'sgp', code:'SGP', name:'Singapur', ex:'SGX', tz:'Asia/Singapore', s:[[9,0,12,0],[13,0,17,0]], x:[[8,30,9,0],[17,0,17,6]], c:'#CF9A42'},
+  {id:'bom', code:'BOM', name:'Bombay', ex:'NSE', tz:'Asia/Kolkata', s:[[9,15,15,30]], x:[[9,0,9,15],[15,40,16,0]], c:'#B5803C'},
+  {id:'fra', code:'FRA', name:'Fráncfort', ex:'Xetra', tz:'Europe/Berlin', s:[[9,0,17,30]], x:[[8,0,9,0],[17,30,22,0]], c:'#47A3D6'},
+  {id:'lon', code:'LON', name:'Londres', ex:'LSE', tz:'Europe/London', s:[[8,0,16,30]], x:[[7,0,8,0],[16,30,17,15]], c:'#5A7FE6'},
+  {id:'nyc', code:'NY', name:'Nueva York', ex:'NYSE / Nasdaq', tz:'America/New_York', s:[[9,30,16,0]], x:[[4,0,9,30],[16,0,20,0]], c:'#D9577A'},
+  {id:'mex', code:'BMV', name:'Ciudad de México', ex:'BMV', tz:'America/Mexico_City', s:[[8,30,15,0]], x:[[8,0,8,30],[15,0,15,10]], c:'#9B7BE0'}
+];
+
+/* Festivos por bolsa, fecha local de la bolsa. [nombre] = cerrado; [nombre, 'HH:MM'] = cierre anticipado */
+const HOL = {
+  nyc:{'2026-11-26':['Thanksgiving'],'2026-11-27':['Día después de Thanksgiving','13:00'],'2026-12-24':['Nochebuena','13:00'],'2026-12-25':['Navidad'],
+       '2027-01-01':['Año Nuevo'],'2027-01-18':['Martin Luther King Jr.'],'2027-02-15':['Día de los Presidentes'],'2027-03-26':['Viernes Santo'],
+       '2027-05-31':['Memorial Day'],'2027-06-18':['Juneteenth'],'2027-07-05':['Día de la Independencia'],'2027-09-06':['Labor Day'],
+       '2027-11-25':['Thanksgiving'],'2027-11-26':['Día después de Thanksgiving','13:00'],'2027-12-24':['Navidad']},
+  mex:{'2026-11-16':['Revolución Mexicana'],'2026-12-25':['Navidad'],'2027-01-01':['Año Nuevo'],'2027-02-01':['Día de la Constitución'],
+       '2027-03-15':['Natalicio de Benito Juárez'],'2027-03-25':['Jueves Santo'],'2027-03-26':['Viernes Santo'],'2027-09-16':['Independencia'],
+       '2027-11-02':['Día de Muertos'],'2027-11-15':['Revolución Mexicana']},
+  lon:{'2026-12-24':['Nochebuena','12:30'],'2026-12-25':['Navidad'],'2026-12-28':['Boxing Day'],'2026-12-31':['Fin de año','12:30'],
+       '2027-01-01':['Año Nuevo'],'2027-03-26':['Viernes Santo'],'2027-03-29':['Lunes de Pascua'],'2027-05-03':['Bank holiday'],
+       '2027-05-31':['Bank holiday'],'2027-08-30':['Bank holiday'],'2027-12-24':['Nochebuena','12:30'],'2027-12-27':['Navidad'],
+       '2027-12-28':['Boxing Day'],'2027-12-31':['Fin de año','12:30']},
+  fra:{'2026-12-24':['Nochebuena'],'2026-12-25':['Navidad'],'2026-12-31':['Fin de año'],'2027-01-01':['Año Nuevo'],
+       '2027-03-26':['Viernes Santo'],'2027-03-29':['Lunes de Pascua'],'2027-12-24':['Nochebuena'],'2027-12-31':['Fin de año']},
+  tyo:{'2026-11-23':['Día del Trabajo'],'2026-12-31':['Fin de año'],'2027-01-01':['Año Nuevo'],'2027-01-11':['Mayoría de edad'],
+       '2027-02-11':['Fundación Nacional'],'2027-02-23':['Cumpleaños del Emperador'],'2027-03-22':['Equinoccio de primavera'],
+       '2027-04-29':['Día Showa'],'2027-05-03':['Día de la Constitución'],'2027-05-04':['Día Verde'],'2027-05-05':['Día del Niño'],
+       '2027-07-19':['Día del Mar'],'2027-08-11':['Día de la Montaña'],'2027-09-20':['Respeto a los mayores'],
+       '2027-09-23':['Equinoccio de otoño'],'2027-10-11':['Día del Deporte'],'2027-11-03':['Día de la Cultura'],
+       '2027-11-23':['Día del Trabajo'],'2027-12-31':['Fin de año']},
+  hkg:{'2026-12-24':['Nochebuena','12:00'],'2026-12-25':['Navidad'],'2026-12-31':['Fin de año','12:00'],'2027-01-01':['Año Nuevo'],
+       '2027-02-05':['Víspera de Año Nuevo Lunar','12:00'],'2027-02-08':['Año Nuevo Lunar'],'2027-02-09':['Año Nuevo Lunar'],
+       '2027-03-26':['Viernes Santo'],'2027-03-29':['Lunes de Pascua'],'2027-04-05':['Ching Ming'],'2027-05-13':['Cumpleaños de Buda'],
+       '2027-06-09':['Tuen Ng'],'2027-07-01':['Día de la RAE'],'2027-09-16':['Medio Otoño'],'2027-10-01':['Día Nacional'],
+       '2027-10-08':['Chung Yeung'],'2027-12-24':['Nochebuena','12:00'],'2027-12-27':['Navidad'],'2027-12-31':['Fin de año','12:00']},
+  sha:{'2027-01-01':['Año Nuevo']},
+  sgp:{'2026-11-09':['Deepavali'],'2026-12-24':['Nochebuena','12:00'],'2026-12-25':['Navidad'],'2026-12-31':['Fin de año','12:00'],
+       '2027-01-01':['Año Nuevo'],'2027-02-05':['Víspera de Año Nuevo Lunar','12:00'],'2027-02-08':['Año Nuevo Lunar'],
+       '2027-02-09':['Año Nuevo Lunar'],'2027-03-26':['Viernes Santo'],'2027-08-09':['Día Nacional'],
+       '2027-12-24':['Nochebuena','12:00'],'2027-12-31':['Fin de año','12:00']},
+  bom:{'2026-11-24':['Guru Nanak Jayanti'],'2026-12-25':['Navidad'],'2027-01-26':['Día de la República'],'2027-03-26':['Viernes Santo'],
+       '2027-04-14':['Ambedkar Jayanti']},
+  syd:{'2026-12-24':['Nochebuena','14:10'],'2026-12-25':['Navidad'],'2026-12-28':['Boxing Day'],'2026-12-31':['Fin de año','14:10'],
+       '2027-01-01':['Año Nuevo'],'2027-01-26':['Día de Australia'],'2027-03-26':['Viernes Santo'],'2027-03-29':['Lunes de Pascua'],
+       '2027-06-14':['Cumpleaños del Rey'],'2027-12-24':['Nochebuena','14:10'],'2027-12-27':['Navidad'],'2027-12-28':['Boxing Day'],
+       '2027-12-31':['Fin de año','14:10']}
+};
+const CME_FULL = ['2026-12-25','2027-01-01','2027-12-24'];
+
+/* ---------- time zone helpers ---------- */
+const fmtCache = {};
+function parts(tz, ts){
+  let f = fmtCache[tz];
+  if(!f){ f = fmtCache[tz] = new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric',weekday:'short',hourCycle:'h23'}); }
+  const o = {};
+  for(const p of f.formatToParts(new Date(ts))) o[p.type] = p.value;
+  return {y:+o.year, mo:+o.month, d:+o.day, h:+o.hour % 24, mi:+o.minute, s:+o.second, wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(o.weekday)};
+}
+function tzOffset(tz, ts){
+  const p = parts(tz, ts);
+  return Date.UTC(p.y, p.mo-1, p.d, p.h, p.mi, p.s) - Math.floor(ts/1000)*1000;
+}
+function zonedToUtc(y, mo, d, h, mi, tz){
+  const t = Date.UTC(y, mo-1, d, h, mi);
+  const o = tzOffset(tz, t);
+  let r = t - o;
+  const o2 = tzOffset(tz, r);
+  if(o2 !== o) r = t - o2;
+  return r;
+}
+const hm = {};
+function fmtHM(ts, tz){
+  let f = hm[tz];
+  if(!f) f = hm[tz] = new Intl.DateTimeFormat('es-MX',{timeZone:tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  return f.format(new Date(ts));
+}
+function key(Y,M,D){ return `${Y}-${String(M).padStart(2,'0')}-${String(D).padStart(2,'0')}`; }
+function addDays(Y,M,D,n){ const b = new Date(Date.UTC(Y,M-1,D+n)); return [b.getUTCFullYear(), b.getUTCMonth()+1, b.getUTCDate(), b.getUTCDay()]; }
+function dayKey(ts, tz){ const p = parts(tz, ts); return key(p.y,p.mo,p.d); }
+function weekdayShort(ts, tz){ return new Intl.DateTimeFormat('es-MX',{timeZone:tz,weekday:'short'}).format(new Date(ts)).replace('.',''); }
+const dateFmt = new Intl.DateTimeFormat('es-MX',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'});
+function fmtKey(K){ const [Y,M,D] = K.split('-').map(Number); return dateFmt.format(new Date(Date.UTC(Y,M-1,D,12))).replace(/\./g,''); }
+
+/* sessions: [start, end, groupKey] in UTC ms */
+function sessions(m, now, extended){
+  if(m.always) return [];
+  const p = parts(m.tz, now);
+  const out = [], hol = HOL[m.id] || {};
+  for(let k=-3; k<=10; k++){
+    const [Y,M,D,wd] = addDays(p.y, p.mo, p.d, k);
+    if(m.globex){
+      if(wd > 4) continue;
+      const [EY,EM,ED] = addDays(Y,M,D,1), E = key(EY,EM,ED);
+      const [FY,FM,FD] = addDays(Y,M,D,2), F = key(FY,FM,FD);
+      if(CME_FULL.includes(E)) continue;
+      const short = CME_FULL.includes(F) || (HOL.nyc[E] && !HOL.nyc[E][1]);
+      out.push([zonedToUtc(Y,M,D,18,0,m.tz), zonedToUtc(EY,EM,ED,short?13:17,0,m.tz), E]);
+      continue;
+    }
+    if(wd === 0 || wd === 6) continue;
+    const K = key(Y,M,D), h = hol[K];
+    if(h && !h[1]) continue;
+    const close = h && h[1] ? h[1].split(':').map(Number) : null;
+    const cMin = close ? close[0]*60 + close[1] : 9999;
+    const list = extended ? (m.x || []).filter(s => !close || s[0]*60 + s[1] < cMin) : m.s;
+    for(const s of list){
+      let [h1,m1,h2,m2] = s;
+      if(!extended && close){
+        if(h1*60+m1 >= cMin) continue;
+        if(h2*60+m2 > cMin){ h2 = close[0]; m2 = close[1]; }
+      }
+      out.push([zonedToUtc(Y,M,D,h1,m1,m.tz), zonedToUtc(Y,M,D,h2,m2,m.tz), K]);
+    }
+  }
+  return out.sort((a,b)=>a[0]-b[0]);
+}
+
+function todayHoliday(m, now){
+  if(m.always) return null;
+  const p = parts(m.tz, now);
+  if(p.wd === 0 || p.wd === 6) return null;
+  const K = key(p.y,p.mo,p.d);
+  if(m.globex){ const h = HOL.nyc[K]; return h ? {name:h[0], close:h[1] || null, cme:true} : null; }
+  const h = (HOL[m.id] || {})[K];
+  return h ? {name:h[0], close:h[1] || null} : null;
+}
+
+function status(m, now, ss){
+  if(m.always) return {state:'open', label:'Abierto', cd:'Siempre abierto'};
+  const cur = ss.find(s => now >= s[0] && now < s[1]);
+  if(cur){
+    const last = !ss.some(s => s[2] === cur[2] && s[0] >= cur[1]);
+    return {state:'open', label:'Abierto', cd:(last ? 'Cierra en ' : 'Pausa en ') + dur(cur[1]-now), group:cur[2]};
+  }
+  const next = ss.find(s => s[0] > now);
+  const prev = [...ss].reverse().find(s => s[1] <= now);
+  if(next && prev && next[2] === prev[2]) return {state:'pause', label:'En pausa', cd:'Reanuda en ' + dur(next[0]-now), group:next[2]};
+  const th = todayHoliday(m, now);
+  const isHol = th && !th.close && !m.globex;
+  return {state: isHol ? 'holiday' : 'closed', label: isHol ? 'Festivo' : 'Cerrado', cd: next ? 'Abre en ' + dur(next[0]-now) : '', group: next ? next[2] : null};
+}
+function dur(ms){
+  const t = Math.max(0, Math.ceil(ms/60000));
+  const d = Math.floor(t/1440), h = Math.floor((t%1440)/60), m = t%60;
+  if(d) return `${d} d ${h} h`;
+  if(h) return `${h} h ${m} min`;
+  return `${m} min`;
+}
+
+/* ---------- settings ---------- */
+const sel = document.getElementById('tz');
+let browserTz = 'America/Mexico_City';
+try{ browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || browserTz; }catch(e){}
+const TZS = [...new Set([browserTz,'America/Mexico_City','America/Monterrey','America/Cancun','America/Tijuana','America/Bogota','America/Lima','America/Santiago','America/Argentina/Buenos_Aires','America/Sao_Paulo','America/New_York','America/Chicago','America/Los_Angeles','Europe/Madrid','Europe/London','Asia/Tokyo','UTC'])];
+for(const z of TZS){
+  const o = document.createElement('option');
+  o.value = z; o.textContent = z.replace(/_/g,' ').replace('America/','').replace('Europe/','').replace('Asia/','').replace('Argentina/','') + (z===browserTz ? ' (tu equipo)' : '');
+  sel.appendChild(o);
+}
+let TZ = browserTz, EXT = false;
+try{ const saved = localStorage.getItem('rm-tz'); if(saved && TZS.includes(saved)) TZ = saved; EXT = localStorage.getItem('rm-ext') === '1'; }catch(e){}
+sel.value = TZ;
+const extBox = document.getElementById('ext');
+extBox.checked = EXT;
+sel.addEventListener('change', ()=>{ TZ = sel.value; try{ localStorage.setItem('rm-tz', TZ); }catch(e){} drawArcs(); tick(); });
+extBox.addEventListener('change', ()=>{ EXT = extBox.checked; try{ localStorage.setItem('rm-ext', EXT ? '1' : '0'); }catch(e){} drawArcs(); });
+
+/* ---------- dial ---------- */
+const NS = 'http://www.w3.org/2000/svg', C = 300;
+const R0 = 260, STEP = 14;
+function el(n, a, parent){ const e = document.createElementNS(NS, n); for(const k in a) e.setAttribute(k, a[k]); if(parent) parent.appendChild(e); return e; }
+function polar(r, f){ const a = f*2*Math.PI - Math.PI/2; return [C + r*Math.cos(a), C + r*Math.sin(a)]; }
+function arc(r, f0, f1){
+  const [x0,y0] = polar(r,f0), [x1,y1] = polar(r,f1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${(f1-f0)>0.5?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function arcRev(r, f0, f1){
+  const [x0,y0] = polar(r,f0), [x1,y1] = polar(r,f1);
+  return `M${x1.toFixed(2)} ${y1.toFixed(2)} A${r} ${r} 0 ${(f1-f0)>0.5?1:0} 0 ${x0.toFixed(2)} ${y0.toFixed(2)}`;
+}
+let lblId = 0;
+function addLabel(parent, r, f0, f1, text){
+  if((f1-f0) * 2*Math.PI*r < text.length*6 + 10) return;
+  const mid = ((f0+f1)/2) % 1;
+  const flip = mid > 0.25 && mid < 0.75;
+  const id = 'lp' + (lblId++);
+  el('path', {id, d: flip ? arcRev(r,f0,f1) : arc(r,f0,f1), fill:'none', stroke:'none'}, parent);
+  const t = el('text', {class:'ringlbl', 'dominant-baseline':'central'}, parent);
+  const tp = el('textPath', {href:'#'+id, startOffset:'50%', 'text-anchor':'middle'}, t);
+  tp.textContent = text;
+}
+const svg = el('svg', {viewBox:'0 0 600 600', role:'img', 'aria-label':'Reloj de 24 horas con los horarios de los mercados'});
+document.getElementById('dial').appendChild(svg);
+for(let h=0; h<24; h++){
+  const major = h % 6 === 0;
+  const [a,b] = polar(272, h/24), [c,d] = polar(major ? 266 : 269, h/24);
+  el('line', {x1:a, y1:b, x2:c, y2:d, class:'tick' + (major?' major':'')}, svg);
+  const [x,y] = polar(287, h/24);
+  const t = el('text', {x, y, 'text-anchor':'middle', 'dominant-baseline':'central', class:'hourlbl' + (major?' major':'')}, svg);
+  t.textContent = h;
+}
+const ringsG = el('g', {}, svg);
+const rings = {};
+MKTS.forEach((m,i)=>{
+  const r = R0 - i*STEP;
+  const g = el('g', {class:'ring', 'data-id':m.id}, ringsG);
+  el('circle', {cx:C, cy:C, r, class:'trackc'}, g);
+  const segs = el('g', {}, g);
+  rings[m.id] = {g, segs, r};
+  g.addEventListener('pointerenter', e=>{ if(e.pointerType==='mouse') hover(m.id); });
+  g.addEventListener('pointerleave', e=>{ if(e.pointerType==='mouse') hover(null); });
+  g.addEventListener('click', ()=>select(m.id));
+  g.style.cursor = 'pointer';
+});
+const hand = el('line', {x1:C, y1:C-98, x2:C, y2:C-272, class:'hand'}, svg);
+const handDot = el('circle', {cx:C, cy:C-272, r:5, class:'handdot'}, svg);
+const tTime = el('text', {x:C, y:C-4, 'text-anchor':'middle', class:'center-time'}, svg);
+const tSec = el('text', {x:C, y:C+22, 'text-anchor':'middle', class:'center-sec'}, svg);
+const tMeta = el('text', {x:C, y:C+46, 'text-anchor':'middle', class:'center-meta'}, svg);
+const tName = el('text', {x:C, y:C-52, 'text-anchor':'middle', class:'center-name'}, svg);
+const tHrs = el('text', {x:C, y:C+66, 'text-anchor':'middle', class:'center-meta'}, svg);
+
+let W0 = 0, W1 = 0, SS = {};
+function drawArcs(){
+  const now = Date.now();
+  const p = parts(TZ, now);
+  W0 = zonedToUtc(p.y, p.mo, p.d, 0, 0, TZ);
+  W1 = zonedToUtc(p.y, p.mo, p.d+1, 0, 0, TZ);
+  const span = W1 - W0;
+  lblId = 0;
+  for(const m of MKTS){
+    const {segs, r} = rings[m.id];
+    segs.innerHTML = '';
+    SS[m.id] = sessions(m, now);
+    if(m.always){
+      el('circle', {cx:C, cy:C, r, class:'seg', stroke:m.c}, segs);
+      addLabel(segs, r, -0.06, 0.06, m.code);
+      continue;
+    }
+    const draw = (list, cls, label) => {
+      for(const s of list){
+        const a = Math.max(s[0], W0), b = Math.min(s[1], W1);
+        if(b <= a) continue;
+        const f0 = (a-W0)/span, f1 = (b-W0)/span;
+        if(f1 - f0 > 0.9995){ el('circle', {cx:C, cy:C, r, class:cls, stroke:m.c}, segs); if(label) addLabel(segs, r, -0.06, 0.06, m.code); continue; }
+        el('path', {d:arc(r, f0, f1), class:cls, stroke:m.c}, segs);
+        if(label) addLabel(segs, r, f0, f1, m.code);
+      }
+    };
+    if(EXT && m.x) draw(sessions(m, now, true), 'seg ext', false);
+    draw(SS[m.id], 'seg', true);
+  }
+}
+
+/* ---------- list ---------- */
+const list = document.getElementById('list');
+const rows = {};
+MKTS.forEach(m=>{
+  const row = document.createElement('div');
+  row.className = 'row'; row.tabIndex = 0;
+  row.innerHTML = `<span class="dot" style="background:${m.c}"></span>
+    <div><span class="name">${m.name}</span><span class="ex">${m.ex}</span></div>
+    <div class="right"><span class="cd"></span><span class="pill"></span></div>
+    <div class="hrs"></div>`;
+  row.addEventListener('pointerenter', e=>{ if(e.pointerType==='mouse') hover(m.id); });
+  row.addEventListener('pointerleave', e=>{ if(e.pointerType==='mouse') hover(null); });
+  row.addEventListener('click', ()=>select(m.id));
+  row.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); select(m.id); } });
+  list.appendChild(row);
+  rows[m.id] = {row, pill:row.querySelector('.pill'), cd:row.querySelector('.cd'), hrs:row.querySelector('.hrs')};
+});
+let hoverId = null, selId = null;
+try{ selId = localStorage.getItem('rm-sel') || null; if(!MKTS.some(m => m.id === selId)) selId = null; }catch(e){}
+function hover(id){ hoverId = id; applyHL(); tick(); }
+function select(id){
+  selId = selId === id ? null : id;
+  try{ localStorage.setItem('rm-sel', selId || ''); }catch(e){}
+  applyHL(); tick();
+}
+function applyHL(){
+  const id = hoverId || selId;
+  svg.classList.toggle('dim', !!id);
+  for(const m of MKTS){
+    rings[m.id].g.classList.toggle('hl', m.id === id);
+    rows[m.id].row.classList.toggle('hl', m.id === id);
+    rows[m.id].row.classList.toggle('sel', m.id === selId);
+  }
+}
+applyHL();
+
+/* ---------- upcoming holidays ---------- */
+function renderUpcoming(now){
+  const items = [];
+  for(const m of MKTS){
+    if(!HOL[m.id]) continue;
+    const p = parts(m.tz, now);
+    const today = key(p.y,p.mo,p.d);
+    const [LY,LM,LD] = addDays(p.y,p.mo,p.d,30), limit = key(LY,LM,LD);
+    for(const [K,v] of Object.entries(HOL[m.id])) if(K >= today && K <= limit) items.push({K, m, v});
+  }
+  items.sort((a,b)=> a.K < b.K ? -1 : a.K > b.K ? 1 : 0);
+  const ul = document.getElementById('upc');
+  if(!items.length){ ul.innerHTML = '<li class="empty">Sin festivos en los próximos 30 días.</li>'; return; }
+  ul.innerHTML = items.slice(0,7).map(({K,m,v}) =>
+    `<li><span class="d">${fmtKey(K)}</span><span class="dot" style="background:${m.c}"></span><span><strong>${m.name}</strong> ${v[1] ? `cierra ${v[1]} (hora local) por ${v[0]}` : `cerrado por ${v[0]}`}</span></li>`
+  ).join('');
+}
+
+/* ---------- tick ---------- */
+let lastMinute = -1;
+function tick(){
+  const now = Date.now();
+  const p = parts(TZ, now);
+  if(p.mi !== lastMinute || now >= W1){ lastMinute = p.mi; drawArcs(); renderUpcoming(now); }
+
+  const deg = (now - W0) / (W1 - W0) * 360;
+  hand.setAttribute('transform', `rotate(${deg} ${C} ${C})`);
+  handDot.setAttribute('transform', `rotate(${deg} ${C} ${C})`);
+  tTime.textContent = String(p.h).padStart(2,'0') + ':' + String(p.mi).padStart(2,'0');
+  tSec.textContent = ':' + String(p.s).padStart(2,'0');
+  tMeta.textContent = new Intl.DateTimeFormat('es-MX',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(new Date(now));
+
+  const today = dayKey(now, TZ);
+  const openIds = [];
+  const centerInfo = {};
+  for(const m of MKTS){
+    const st = status(m, now, SS[m.id] || []);
+    const r = rows[m.id];
+    r.pill.className = 'pill ' + st.state;
+    r.pill.textContent = st.label;
+    r.cd.textContent = st.cd;
+    if(st.state === 'open' && !m.always) openIds.push(m.id);
+    centerInfo[m.id] = {st, rng: m.always ? 'Todo el día' : ''};
+    if(m.always){ r.hrs.innerHTML = 'Mercado continuo, sin cierre'; continue; }
+
+    const lines = [];
+    const th = todayHoliday(m, now);
+    if(th){
+      if(th.cme) lines.push(`<span class="hol">Horario reducido por ${th.name} en EE. UU.</span>`);
+      else if(th.close) lines.push(`<span class="hol">Hoy cierra ${th.close} (hora local) por ${th.name}</span>`);
+      else lines.push(`<span class="hol">Hoy: ${th.name}</span>`);
+    }
+    if(st.group != null){
+      const g = SS[m.id].filter(s => s[2] === st.group);
+      const a = g[0][0], b = g[g.length-1][1];
+      const pre = dayKey(a, TZ) !== today ? weekdayShort(a, TZ) + ' ' : '';
+      const rng = `${pre}${fmtHM(a, TZ)}–${fmtHM(b, TZ)}`;
+      centerInfo[m.id].rng = rng + ' tu hora';
+      lines.push(`Tu hora: ${rng}${g.length > 1 ? ' (con pausa)' : ''}`);
+    }
+    lines.push(`Allá son las <span class="loc">${fmtHM(now, m.tz)}</span>`);
+    r.hrs.innerHTML = lines.join('<br>');
+  }
+
+  const stocks = MKTS.filter(m => !m.always && !m.globex).length;
+  const openStocks = openIds.filter(id => id !== 'cme').length;
+  document.getElementById('sumTitle').textContent = openStocks ? `${openStocks} de ${stocks} bolsas abiertas` : 'Todas las bolsas están cerradas';
+  let txt;
+  if(openIds.includes('lon') && openIds.includes('nyc')) txt = 'Traslape Londres y Nueva York: la ventana de mayor liquidez del día.';
+  else if(openIds.includes('fra') && openIds.includes('tyo')) txt = 'Traslape Asia y Europa en curso.';
+  else if(openIds.includes('nyc')) txt = 'Sesión de Nueva York activa.';
+  else if(openIds.includes('lon')) txt = 'Sesión europea activa.';
+  else if(openStocks) txt = 'Sesión asiática activa.';
+  else txt = openIds.includes('cme') ? 'Futuros de metales operando en Globex. Cripto sigue 24/7.' : 'Solo cripto está operando.';
+  document.getElementById('sumText').textContent = txt;
+
+  const sm = MKTS.find(m => m.id === (hoverId || selId));
+  if(sm){
+    const ci = centerInfo[sm.id];
+    tName.textContent = sm.name;
+    tName.setAttribute('fill', sm.c);
+    tMeta.textContent = ci.st.cd || ci.st.label;
+    tHrs.textContent = ci.rng;
+  } else {
+    tName.textContent = '';
+    tHrs.textContent = '';
+  }
+}
+drawArcs();
+renderUpcoming(Date.now());
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

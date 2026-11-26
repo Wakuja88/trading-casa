@@ -1,0 +1,9 @@
+[Unit]
+Description=Revisar GitHub cada minuto (trading casa)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
