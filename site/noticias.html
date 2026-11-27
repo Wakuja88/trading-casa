@@ -7,12 +7,12 @@
 <style>
 :root{
   --bg:#eef1f6; --panel:#ffffff; --ink:#18223a; --muted:#5d6782; --line:#d6dbe6; --accent:#2747c9;
-  --new:#0f8a5f; --warn:#a86a00; --field:#f6f8fb;
+  --new:#0f8a5f; --warn:#a86a00; --field:#f6f8fb; --hot:#c23a32;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#121826; --panel:#1b2335; --ink:#e7ebf4; --muted:#97a1ba; --line:#2d3850; --accent:#7d97ff;
-         --new:#3fcf95; --warn:#f2b54a; --field:#151c2b; color-scheme:dark; }
+         --new:#3fcf95; --warn:#f2b54a; --field:#151c2b; --hot:#ff7b72; color-scheme:dark; }
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0}
@@ -33,7 +33,7 @@ ul{list-style:none;margin:0;padding:0}
 li{display:grid;grid-template-columns:52px 1fr;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
 li:last-child{border-bottom:0}
 .hora{font-variant-numeric:tabular-nums;font-weight:600;color:var(--muted);padding-top:1px}
-.meta{display:flex;gap:8px;align-items:center;font-size:.78rem;color:var(--muted);margin-bottom:2px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:.78rem;color:var(--muted);margin-bottom:2px}
 .src{font-weight:700}
 .nuevo{color:var(--new);font-weight:700}
 li a{color:var(--ink);text-decoration:none;font-weight:600;font-size:1rem}
@@ -41,6 +41,17 @@ li a:hover{color:var(--accent);text-decoration:underline}
 .res{grid-column:2;font-size:.88rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8px;padding-left:6px;padding-right:6px}
 .vacio{color:var(--muted);padding:24px 0;text-align:center}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.filtros[hidden]{display:none}
+select{font:inherit;font-size:.85rem;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{font:inherit;font-size:.85rem;font-weight:600;color:var(--muted);background:var(--panel);border:0;padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{color:#fff;background:var(--accent)}
+.filtros label{font-size:.85rem;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.tags{display:inline-flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.alto{color:var(--hot);font-weight:700}
+li.imp-alto{border-left:3px solid var(--hot);padding-left:8px}
 </style>
 </head>
 <body>
@@ -52,19 +63,45 @@ li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8
   <div class="top">
     <input type="search" id="q" placeholder="Buscar: BTC, ETF, SEC, Fed…" aria-label="Buscar en titulares">
   </div>
-  <div class="chips" id="chips" role="group" aria-label="Filtrar por medio"></div>
+  <div class="filtros" id="filtrosMundo" hidden>
+    <div class="seg" role="group" aria-label="Importancia">
+      <button type="button" data-imp="alto">Alto impacto</button>
+      <button type="button" data-imp="relevante">Relevantes</button>
+      <button type="button" data-imp="todo">Todo</button>
+    </div>
+    <label>Medio <select id="medio" aria-label="Filtrar por medio"></select></label>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="Filtrar"></div>
   <div class="aviso" id="aviso"></div>
   <div id="lista"></div>
 </main>
 <script>
 (function(){
   const TZ = 'America/Mexico_City', REFRESH = 60000;
+  const SECCION = new URLSearchParams(location.search).get('seccion') || 'cripto';
+  const MUNDO = SECCION === 'mundo';
+  const TEMAS = ['Bancos centrales','Macro','Geopolítica','Política','Negocios','Energía y metales','Cripto'];
   const $ = id => document.getElementById(id);
   const hora = new Intl.DateTimeFormat('es-MX',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   const diaKey = new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
   const diaLargo = new Intl.DateTimeFormat('es-MX',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
-  let data = null, filtro = 'Todos', vistos = null, frescos = new Set();
-  try { filtro = localStorage.getItem('noticias-fuente') || 'Todos'; } catch(e) {}
+  const K = k => 'noticias-' + SECCION + '-' + k;
+  const leer = (k, def) => { try { return localStorage.getItem(K(k)) || def; } catch(e) { return def; } };
+  const guardar = (k, v) => { try { localStorage.setItem(K(k), v); } catch(e) {} };
+  let data = null, vistos = null, frescos = new Set();
+  let filtro = leer('fuente', 'Todos');          // cripto: medio · mundo: tema
+  let imp = leer('impacto', 'relevante');        // solo mundo
+  let medio = leer('medio', 'Todos');            // solo mundo
+  if (MUNDO) {
+    document.title = 'Noticias del mundo';
+    document.querySelector('h1').textContent = 'Noticias del mundo';
+    $('q').placeholder = 'Buscar: Fed, tariffs, China, oil, Nvidia…';
+    $('filtrosMundo').hidden = false;
+    document.querySelectorAll('[data-imp]').forEach(b => b.onclick = () => { imp = b.dataset.imp; guardar('impacto', imp); chips(); lista(); });
+    $('medio').onchange = e => { medio = e.target.value; guardar('medio', medio); chips(); lista(); };
+  }
+  const pasaImp = n => !MUNDO || imp === 'todo' || (imp === 'alto' ? n.impacto === 'alto' : n.impacto !== 'bajo');
+  const pasaMedio = n => !MUNDO || medio === 'Todos' || n.fuente === medio;
 
   function hace(ms){
     const m = Math.round((Date.now()-ms)/60000);
@@ -83,13 +120,25 @@ li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8
 
   function chips(){
     const c = $('chips'); c.textContent='';
-    const conteo = {}; data.noticias.forEach(n => conteo[n.fuente]=(conteo[n.fuente]||0)+1);
-    const nombres = ['Todos', ...data.fuentes.map(f=>f.nombre)];
+    let nombres, cuenta;
+    if (MUNDO) {
+      document.querySelectorAll('[data-imp]').forEach(b => b.setAttribute('aria-pressed', b.dataset.imp === imp));
+      const sel = $('medio'); sel.textContent='';
+      ['Todos', ...data.fuentes.map(f=>f.nombre)].forEach(nm => { const o=el('option',null,nm); o.value=nm; sel.append(o); });
+      if (![...sel.options].some(o=>o.value===medio)) medio='Todos';
+      sel.value = medio;
+      const base = data.noticias.filter(n => pasaImp(n) && pasaMedio(n));
+      nombres = ['Todos', ...TEMAS];
+      cuenta = nm => nm==='Todos' ? base.length : base.filter(n => (n.temas||[]).includes(nm)).length;
+    } else {
+      nombres = ['Todos', ...data.fuentes.map(f=>f.nombre)];
+      cuenta = nm => nm==='Todos' ? data.noticias.length : data.noticias.filter(n=>n.fuente===nm).length;
+    }
     if (!nombres.includes(filtro)) filtro='Todos';
     nombres.forEach(nm => {
       const b = el('button'); b.type='button'; b.setAttribute('aria-pressed', nm===filtro);
-      b.append(nm+' ', el('span','n', nm==='Todos'?data.noticias.length:(conteo[nm]||0)));
-      b.onclick = () => { filtro=nm; try{localStorage.setItem('noticias-fuente',nm);}catch(e){} chips(); lista(); };
+      b.append(nm+' ', el('span','n', cuenta(nm)));
+      b.onclick = () => { filtro=nm; guardar('fuente', nm); chips(); lista(); };
       c.append(b);
     });
     const caidos = data.fuentes.filter(f=>!f.ok).map(f=>f.nombre);
@@ -98,7 +147,8 @@ li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8
 
   function lista(){
     const q = $('q').value.trim().toLowerCase();
-    const items = data.noticias.filter(n => (filtro==='Todos'||n.fuente===filtro) &&
+    const pasaFiltro = n => filtro==='Todos' || (MUNDO ? (n.temas||[]).includes(filtro) : n.fuente===filtro);
+    const items = data.noticias.filter(n => pasaFiltro(n) && pasaImp(n) && pasaMedio(n) &&
       (!q || (n.titulo+' '+n.resumen).toLowerCase().includes(q)));
     const cont = $('lista'); cont.textContent='';
     if (!items.length){ cont.append(el('p','vacio', q ? 'Nada coincide con "'+q+'".' : 'Sin noticias por ahora.')); return; }
@@ -107,12 +157,14 @@ li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8
       const ms = n.fecha || data.actualizado;
       const d = etiquetaDia(ms);
       if (d !== diaActual){ diaActual=d; cont.append(el('div','dia',d)); ul=el('ul'); cont.append(ul); }
-      const li = el('li', frescos.has(n.link)?'fresh':null);
+      const li = el('li', [frescos.has(n.link)?'fresh':'', MUNDO && n.impacto==='alto'?'imp-alto':''].join(' ').trim() || null);
       li.append(el('div','hora', n.fecha ? hora.format(n.fecha) : '–'));
       const cuerpo = el('div');
       const meta = el('div','meta'); meta.append(el('span','src',n.fuente));
       const h = n.fecha ? hace(n.fecha) : ''; if (h) meta.append(el('span',null,h));
+      if (MUNDO && n.impacto==='alto') meta.append(el('span','alto','Alto impacto'));
       if (frescos.has(n.link)) meta.append(el('span','nuevo','● nuevo'));
+      if (MUNDO && (n.temas||[]).length) { const t=el('span','tags'); n.temas.forEach(x=>t.append(el('span','tag',x))); meta.append(t); }
       const a = el('a',null,n.titulo); a.href=n.link; a.target='_blank'; a.rel='noopener';
       cuerpo.append(meta, a); li.append(cuerpo);
       if (n.resumen && n.resumen !== n.titulo) li.append(el('div','res',n.resumen));
@@ -122,7 +174,7 @@ li.fresh{background:color-mix(in srgb,var(--new) 9%,transparent);border-radius:8
 
   async function cargar(){
     try{
-      const r = await fetch('/api/noticias', {cache:'no-store'});
+      const r = await fetch('/api/noticias?seccion=' + encodeURIComponent(SECCION), {cache:'no-store'});
       if (!r.ok) throw new Error('HTTP '+r.status);
       data = await r.json();
       const links = new Set(data.noticias.map(n=>n.link));
