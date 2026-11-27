@@ -51,7 +51,7 @@ SECCIONES = {
         ("CNBC", "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
         ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
         ("Financial Times", "https://www.ft.com/rss/home/international"),
-        ("Yahoo Finanzas", "https://finance.yahoo.com/news/rssindex"),
+        ("NYT", "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"),
         ("BBC", "https://feeds.bbci.co.uk/news/business/rss.xml"),
         ("BBC", "https://feeds.bbci.co.uk/news/world/rss.xml"),
         ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
