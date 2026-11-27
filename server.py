@@ -33,17 +33,87 @@ API = "/api/escenarios"
 # ---------------------------------------------------------------------------
 NEWS_API = "/api/noticias"
 NEWS_TTL = 60
-NEWS_MAX = 200
-FEEDS = [
-    ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-    ("Cointelegraph", "https://cointelegraph.com/rss"),
-    ("The Block", "https://www.theblock.co/rss.xml"),
-    ("Decrypt", "https://decrypt.co/feed"),
-    ("Bitcoin Magazine", "https://bitcoinmagazine.com/.rss/full/"),
-]
+NEWS_MAX = 300
+# Cada sección es un tab. Si un feed deja de responder, se cambia aquí.
+SECCIONES = {
+    "cripto": [
+        ("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+        ("Cointelegraph", "https://cointelegraph.com/rss"),
+        ("The Block", "https://www.theblock.co/rss.xml"),
+        ("Decrypt", "https://decrypt.co/feed"),
+        ("Bitcoin Magazine", "https://bitcoinmagazine.com/.rss/full/"),
+    ],
+    "mundo": [
+        ("Fed", "https://www.federalreserve.gov/feeds/press_all.xml"),
+        ("BCE", "https://www.ecb.europa.eu/rss/press.html"),
+        ("CNBC", "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+        ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
+        ("CNBC", "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
+        ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
+        ("Financial Times", "https://www.ft.com/rss/home/international"),
+        ("Yahoo Finanzas", "https://finance.yahoo.com/news/rssindex"),
+        ("BBC", "https://feeds.bbci.co.uk/news/business/rss.xml"),
+        ("BBC", "https://feeds.bbci.co.uk/news/world/rss.xml"),
+        ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
+    ],
+}
+# Fuentes oficiales: siempre cuentan como banco central. Solo son "alto impacto"
+# si tratan de política monetaria (no avisos administrativos o sanciones a bancos).
+OFICIALES = {"Fed", "BCE"}
+_OFICIAL_ALTO = re.compile(r"fomc|monetary policy|interest rates?|policy rates?|minutes|press conference|projections|powell|lagarde|governing council|beige book", re.I)
+
+# Temas y palabras clave (en inglés, como vienen los titulares).
+# Peso 3 = suele mover el mercado el mismo día; 2 = relevante; 1 = contexto.
+TEMAS = {
+    "Bancos centrales": [
+        (3, r"\bfed\b|\bfomc\b|powell|federal reserve|rate (cut|hike)|interest rates?|\becb\b|lagarde|bank of japan|\bboj\b|ueda|bank of england|\bboe\b|central bank|quantitative|balance sheet"),
+        (2, r"\bbasis points?\b|\bdovish|\bhawkish|monetary policy|banxico|\bpboc\b"),
+    ],
+    "Macro": [
+        (3, r"\bcpi\b|inflation|payrolls?|jobs report|unemployment|\bgdp\b|recession|\bpce\b|treasury yields?|bond yields?|10-year"),
+        (2, r"\bpmi\b|retail sales|jobless claims|consumer (confidence|sentiment)|housing starts|deficit|debt ceiling|credit rating|downgrade"),
+    ],
+    "Geopolítica": [
+        (3, r"\bwar\b|invasion|missile|airstrike|sanctions?|nuclear|ceasefire|military|attack"),
+        (2, r"ukraine|russia|putin|china|chinese|beijing|taiwan|xi jinping|iran|israel|gaza|north korea|middle east|nato|red sea|strait of hormuz"),
+    ],
+    "Política": [
+        (3, r"tariffs?|trade war|trade deal|executive order|government shutdown|white house"),
+        (2, r"\btrump\b|congress|senate|election|treasury secretary|bessent|regulation|\bsec\b|antitrust"),
+    ],
+    "Negocios": [
+        (3, r"earnings|guidance|bankruptcy|default|layoffs|merger|acquisition|takeover|\bipo\b"),
+        (2, r"nvidia|apple|microsoft|tesla|amazon|alphabet|google|\bmeta\b|openai|jpmorgan|goldman|blackrock|wall street|s&p 500|nasdaq|dow jones|stocks?|market rally|sell-?off"),
+    ],
+    "Energía y metales": [
+        (3, r"\boil\b|crude|\bopec\b|\bgold\b|\bsilver\b"),
+        (2, r"natural gas|brent|\bwti\b|copper|commodit|precious metals?"),
+    ],
+    "Cripto": [
+        (2, r"bitcoin|crypto|stablecoin|ethereum|\betf\b"),
+    ],
+}
+_TEMAS_RE = {t: [(w, re.compile(rx, re.I)) for w, rx in reglas] for t, reglas in TEMAS.items()}
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
-_news = {"t": 0.0, "data": None}
+_news = {}  # sección -> {"t": epoch, "data": dict}
 _news_lock = threading.Lock()
+
+
+def _clasificar(item):
+    """Agrega temas y una puntuación de impacto a la noticia."""
+    texto = item["titulo"] + " " + item["resumen"]
+    temas, score = [], 0
+    for tema, reglas in _TEMAS_RE.items():
+        peso = max((w for w, rx in reglas if rx.search(texto)), default=0)
+        if peso:
+            temas.append(tema)
+            score += peso
+    if item["fuente"] in OFICIALES:
+        score = 3 if _OFICIAL_ALTO.search(texto) else 1
+        temas = ["Bancos centrales"] + [t for t in temas if t != "Bancos centrales"]
+    item["temas"] = temas
+    item["impacto"] = "alto" if score >= 3 else ("medio" if score >= 1 else "bajo")
+    return item
 
 
 def _local(tag):
@@ -110,48 +180,40 @@ def _bajar(fuente_url):
         return fuente, [], f"{type(e).__name__}: {e}"[:160]
 
 
-def noticias():
+def noticias(seccion):
+    feeds = SECCIONES.get(seccion)
+    if feeds is None:
+        return None
     with _news_lock:
-        if _news["data"] and time.time() - _news["t"] < NEWS_TTL:
-            return _news["data"]
-        with ThreadPoolExecutor(max_workers=len(FEEDS)) as ex:
-            resultados = list(ex.map(_bajar, FEEDS))
-        vistos, todas, fuentes = set(), [], []
+        cache = _news.get(seccion)
+        if cache and time.time() - cache["t"] < NEWS_TTL:
+            return cache["data"]
+        with ThreadPoolExecutor(max_workers=len(feeds)) as ex:
+            resultados = list(ex.map(_bajar, feeds))
+        vistos, todas, fuentes = set(), [], {}
         for fuente, items, err in resultados:
-            fuentes.append({"nombre": fuente, "ok": err is None, "total": len(items), "error": err})
+            f = fuentes.setdefault(fuente, {"nombre": fuente, "ok": False, "total": 0, "error": None})
+            if err is None:
+                f["ok"] = True
+            elif not f["ok"]:
+                f["error"] = err
             for it in items:
                 if it["link"] not in vistos:
                     vistos.add(it["link"])
-                    todas.append(it)
+                    todas.append(_clasificar(it))
+                    f["total"] += 1
+        for f in fuentes.values():
+            if f["ok"]:
+                f["error"] = None
         todas.sort(key=lambda x: x["fecha"] or 0, reverse=True)
-        data = {"actualizado": int(time.time() * 1000), "fuentes": fuentes, "noticias": todas[:NEWS_MAX]}
+        data = {"actualizado": int(time.time() * 1000), "seccion": seccion,
+                "fuentes": list(fuentes.values()), "noticias": todas[:NEWS_MAX]}
         # Si todo falló, se sigue mostrando lo último bueno
-        if todas or not _news["data"]:
-            _news["data"], _news["t"] = data, time.time()
+        if todas or not cache:
+            _news[seccion] = {"t": time.time(), "data": data}
         else:
-            _news["data"]["fuentes"], _news["t"] = fuentes, time.time()
-        return _news["data"]
-
-
-def leer():
-    try:
-        with open(DATA, encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
-def guardar(lista):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=DATA_DIR, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(lista, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, DATA)  # escritura atómica: nunca queda un archivo a medias
-    except BaseException:
-        os.unlink(tmp)
-        raise
+            cache["data"]["fuentes"], cache["t"] = data["fuentes"], time.time()
+        return _news[seccion]["data"]
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -180,8 +242,11 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self._is_api():
             return self._json(200, leer())
-        if self.path.split("?")[0].rstrip("/") == NEWS_API:
-            return self._json(200, noticias())
+        ruta, _, query = self.path.partition("?")
+        if ruta.rstrip("/") == NEWS_API:
+            params = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
+            data = noticias(params.get("seccion", "cripto"))
+            return self._json(200, data) if data else self._json(404, {"error": "sección desconocida"})
         return super().do_GET()
 
     def do_PUT(self):
