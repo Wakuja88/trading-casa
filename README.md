@@ -10,15 +10,16 @@ Dashboard de trading en una sola página, con tabs:
 | Equity Journal | Web app de Google Apps Script (pide sesión de Google) |
 | Calendario económico | Forex Factory |
 | Noticias cripto | Página propia (`site/noticias.html`): titulares de CoinDesk, Cointelegraph, The Block, Decrypt y Bitcoin Magazine, se refresca cada minuto |
+| Noticias mundo | La misma página con `?seccion=mundo`: Fed, BCE, CNBC, MarketWatch, Financial Times, Yahoo Finanzas, BBC y Al Jazeera, clasificadas por tema e impacto |
 | ETF BTC | Farside, flujos de los ETF de Bitcoin |
 | Liquidaciones | Sub-tabs de Coinglass (`site/liquidaciones.html`): liquidaciones, mapa y heatmap BTC |
 
-Abrir un tab directo: `#interes`, `#apalancamiento`, `#reloj`, `#equity`, `#calendario`, `#noticias`, `#etf`, `#liquidaciones`.
+Abrir un tab directo: `#interes`, `#apalancamiento`, `#reloj`, `#equity`, `#calendario`, `#noticias`, `#mundo`, `#etf`, `#liquidaciones`.
 
 ## Archivos
 - `site/index.html`: la barra de tabs. Cada tab carga su página en un iframe. El botón "Abrir aparte ↗" abre el tab actual en otra pestaña.
 - `site/*.html`: las herramientas propias y la página de sub-tabs de liquidaciones.
-- `server.py`: sirve `site/`, guarda los escenarios del interés compuesto en `/var/lib/interes/escenarios.json` (`GET/PUT /api/escenarios`) y junta los feeds RSS de noticias en `GET /api/noticias` (caché de 60 s; la lista de medios está en `FEEDS`). Solo usa la librería estándar de Python.
+- `server.py`: sirve `site/`, guarda los escenarios del interés compuesto en `/var/lib/interes/escenarios.json` (`GET/PUT /api/escenarios`) y junta los feeds RSS de noticias en `GET /api/noticias?seccion=cripto|mundo` (caché de 60 s; los medios de cada sección están en `SECCIONES`). A cada noticia le pone temas e impacto (`alto`, `medio`, `bajo`) según palabras clave definidas en `TEMAS`; los comunicados de la Fed y el BCE solo son alto impacto si tratan de política monetaria. Solo usa la librería estándar de Python.
 - `deploy/`: servicio de systemd y auto-pull.
 
 ## Sitios externos
