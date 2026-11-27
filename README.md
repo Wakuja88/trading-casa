@@ -10,7 +10,7 @@ Dashboard de trading en una sola página, con tabs:
 | Equity Journal | Web app de Google Apps Script (pide sesión de Google) |
 | Calendario económico | Forex Factory |
 | Noticias cripto | Página propia (`site/noticias.html`): titulares de CoinDesk, Cointelegraph, The Block, Decrypt y Bitcoin Magazine, se refresca cada minuto |
-| Noticias mundo | La misma página con `?seccion=mundo`: Fed, BCE, CNBC, MarketWatch, Financial Times, Yahoo Finanzas, BBC y Al Jazeera, clasificadas por tema e impacto |
+| Noticias mundo | La misma página con `?seccion=mundo`: Fed, BCE, CNBC, MarketWatch, Financial Times, New York Times, BBC y Al Jazeera, clasificadas por tema e impacto |
 | ETF BTC | Farside, flujos de los ETF de Bitcoin |
 | Liquidaciones | Sub-tabs de Coinglass (`site/liquidaciones.html`): liquidaciones, mapa y heatmap BTC |
 
