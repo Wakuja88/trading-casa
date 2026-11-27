@@ -11,7 +11,8 @@ CHANGED=$(git diff --name-only "$LOCAL" "$REMOTE")
 git reset --hard --quiet origin/main
 echo "Actualizado ${LOCAL:0:7} -> ${REMOTE:0:7}: $(echo $CHANGED)"
 
-if echo "$CHANGED" | grep -qE '^(server\.py|deploy/trading\.service)$'; then
+# Sin tubería: con pipefail, "echo | grep -q" a veces falla aunque sí haya coincidencia
+if grep -qE '^(server\.py|deploy/trading\.service)$' <<< "$CHANGED"; then
   install -m 644 deploy/trading.service /etc/systemd/system/trading.service
   systemctl daemon-reload
   systemctl restart trading
